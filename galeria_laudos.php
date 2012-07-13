@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name: Galeria de Laudos Médicos
+Plugin Name: Galeria de Laudos Medicos
 Plugin URI: http://www.trajettoria.com
-Description: Plugin para controle e exibição de laudos médicos para médicos e pacientes
+Description: Plugin para controle e exibicao de laudos medicos para medicos e pacientes
 Author: Renato Zuma Bange
 Version: 1.0
 Author URI: http://www.trajettoria.com
@@ -25,32 +25,92 @@ class GaleriaLaudos {
 	 */
 	public static function loadAdminInterface() {
 		
+		global $wpdb;
 		if ( current_user_can('manage_options') ) {
 			echo (
-				"<div class='options-box'>
+				"<div class='galerialaudos_options_list'>
 					<ul>
-						<li><a href='".add_query_arg( 'adminoption', 1 )."' >Inserir novo laudo</a></li>
-						<li><a href='".add_query_arg( 'adminoption', 2 )."' >Editar ou excluir laudos existentes</a></li>
+						<li><a href='".add_query_arg( 'admin_option', 1 )."' >Cadastrar exame</a></li>
+						<li><a href='".add_query_arg( 'admin_option', 2 )."' >Editar ou excluir exames existentes</a></li>
+						<li><a href='".add_query_arg( 'admin_option', 3 )."' >Alterar senhas</a></li>
 					</ul>
 				</div>"
 			);
 			
-			$adminoption = $_GET['adminoption']; // @todo pesquisar função mais apropriada!
+			$adminOption = $_GET['admin_option']; // @todo pesquisar função mais apropriada!
 			
-			switch ( $adminoption ) {
+			switch ( $adminOption ) {
 				case 1:
+					// constructing select dropdown menu...
+					$pacientes = $wpdb->get_results( 'SELECT id, nome FROM traj_paciente', ARRAY_A);
+					$pacientesDropdown = (
+						"<select name='nomePacientes' id='nome_pacientes'>
+							<option value='selecione'>Selecione...</option>"
+					);		
+					foreach ( $pacientes as $key => $paciente ) {
+						$pacientesDropdown .= '<option value="'.$paciente['id'].'">'.$paciente['nome'].'</option>';
+					}
+					$pacientesDropdown .= '</select>';
+					
+					// echo final form
 					echo (
-						"<form method='POST' enctype='multipart/form-data' action=''>
+						"<div class='galerialaudos_forms' id='select_paciente'>
+							<form methos='POST' action''>
+							<p>
+								<label for='nome_pacientes'>Selecione um paciente cadastrado:</label>"
+					);
+					echo $pacientesDropdown;
+					echo (
+						"	</p>
+							<input type='submit' name='selecionar' value='ok' />
+							</form>
+						</div>"
+					);
+
+					echo (
+						"<div class='galerialaudos_forms' id='create_paciente'>
+							<form method='POST' enctype='multipart/form-data' action=''>
+							<p>
+								<label for='nome_novopaciente'>Nome:</label>
+								<input type='text' id='nome_novopaciente' />
+							</p>
+							<p>
+								<label for='matricula_novopaciente'>Matrícula:</label>
+								<input type='text' id='matricula_novopaciente '/>
+							</p>
+							<input type='submit' name='criar' value='ok' />
+						</form>"
+					);
+					
+					
+					/*
+					echo (
+						"<div class='galerialaudos_forms' id='create_laudo'>
+							<form method='POST' enctype='multipart/form-data' action=''>
+							<p>
+								<label for='title'>Título:</label>
+								<input type='text' name='titulo' id='laudo_title' />
+							</p>
+							<p>
+								<label for='obs_medico'>Anotações para o médico:</label>
+								<textarea name='obsmedico' id='obs_medico'></textarea>
+							</p>
+							<p>
+								<label for='obs_paciente'>Anotações para a paciente:</label>
+								<textarea name='obspaciente' id='obs_paciente'></textarea>
+							</p>
     						<div class='file_upload' id='file1'><input name='file[]' type='file'/>1</div>
     						<div id='file_tools'>
         						<div id='add_file'>Adicionar</div>
        	 						<div id='del_file'>Remover</div>
     						</div>
-    						<input type='submit' name='upload' value='Upload'/>
-						</form>"
+    						<input type='submit' name='upload' value='Upload' />
+							</form>
+						</div>"
 					);
 					
 					GaleriaLaudos::processUploads();
+					*/
 					
 					break;
 				case 2:
@@ -81,6 +141,7 @@ class GaleriaLaudos {
 	 * 
 	 * - sanitize file name
 	 * - resolve allowed file extensions
+	 * - check file size (limit = 10mb)
 	 * - move file from temp dir to uploads folder
 	 * - check if file name already exists
 	 * - @todo store all data in db
@@ -93,6 +154,7 @@ class GaleriaLaudos {
 			1 => 'image/gif',
 			2 => 'video/x-flv',
 		);
+		$maxFilesize = 10485760;
 		
 		if ( is_array( $files ) ) {
 			
@@ -105,9 +167,16 @@ class GaleriaLaudos {
 					$filename = $files['name'][$key];
 					// get the file mime and extension
 					$filetype = wp_check_filetype( $filename );
-					// check if file is allowed by mime type			
+					// check if file is allowed by mime type. If it's not allowed, echo the error and move to next file			
 					if ( !in_array( $filetype['type'], $allowedMimeTypes ) ) {
-						echo "Falha no envio do arquivo '$filename'. Verifique se a extensão corresponde a uma das permitidas (jpg, gif ou flv).";
+						echo "Falha no envio do arquivo '$filename'. Verifique se a extensao corresponde a uma das permitidas (jpg, gif ou flv).";
+						continue;
+					}
+					// get the file size
+					$filesize = $files['size'][$key];
+					// check if file size exceeds $maxFilesize. If it does, echo the error end move to next file
+					if ( $filesize > $maxFilesize ) {
+						echo "Fala no envio do arquivo '$filename'. O tamanho ultrapassou o limite de 10mb.";
 						continue;
 					}		
 					// temporary file name assigned by the server
