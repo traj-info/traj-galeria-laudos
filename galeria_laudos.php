@@ -35,7 +35,7 @@ class GaleriaLaudos {
 				</div>"
 			);
 			
-			$adminoption = $_GET['adminoption']; // pesquisar função mais apropriada!
+			$adminoption = $_GET['adminoption']; // @todo pesquisar funÃ§Ã£o mais apropriada!
 			
 			switch ( $adminoption ) {
 				case 1:
@@ -64,20 +64,35 @@ class GaleriaLaudos {
 		}
 		
 	}
+
+	/*
+ 	* 
+ 	*/
+	public static function loadScript() {
+		// Register the script for the plugin
+		wp_register_script( 'multiple-uploads', plugins_url( '/js/multiple-uploads.js', __FILE__ ), array( 'jquery' ) );
+		// Enqueue the script
+		wp_enqueue_script( 'multiple-uploads' );
+	
+	}
 	
 	/*
 	 * processUploads
 	 * 
-	 * - clean file name
-	 * - @todo resolve allowed file extensions
+	 * - sanitize file name
+	 * - resolve allowed file extensions
 	 * - move file from temp dir to uploads folder
 	 * - check if file name already exists
 	 * - @todo store all data in db
-	 * - @todo fixme >> final file is corrupted <<
 	 */
 	public static function processUploads() {
 			
 		$files = $_FILES['file'];
+		$allowedMimeTypes = array( 
+			0 => 'image/jpeg',
+			1 => 'image/gif',
+			2 => 'video/x-flv',
+		);
 		
 		if ( is_array( $files ) ) {
 			
@@ -86,25 +101,32 @@ class GaleriaLaudos {
 				// work only with successfully uploaded files
 				if ( $files['error'][$key] == 0 ) {
 					
+					// full actual file name (it'll be sanitized later)
+					$filename = $files['name'][$key];
+					// get the file mime and extension
+					$filetype = wp_check_filetype( $filename );
+					// check if file is allowed by mime type			
+					if ( !in_array( $filetype['type'], $allowedMimeTypes ) ) {
+						echo "Falha no envio do arquivo '$filename'. Verifique se a extensÃ£o corresponde a uma das permitidas (jpg, gif ou flv).";
+						continue;
+					}		
 					// temporary file name assigned by the server
 					$filetmp = $files['tmp_name'][$key];
-					// actual file name (it'll be sanitized later)
-					$filename = $files['name'][$key];
-					// get the file type (check if it's an allowed file type later)
-					$filetype = wp_check_filetype( $filename );
-					// sanitize file name
+					// sanitize file name and drop the extension, we need just the clean title
 					$filetitle = sanitize_file_name( basename( $filename, '.'.$filetype['ext'] ) );
-					
+					// construct fresh new sanitized file name
 					$filename = $filetitle.'.'.$filetype['ext'];
+					// all processed files will be found here
 					$upload_dir = plugin_dir_path( __FILE__ ).'uploads';
-					
-					$i = 0;
+					// resolve existing file names by adding '_$i', where $i is the number of times it has just repeated 
+					$i = 1;
 					while ( file_exists( $upload_dir.'/'.$filename ) ) {
 						$filename = $filetitle.'_'.$i.'.'.$filetype['ext'];
+						$i++;
 					}
-					
+					// final file path
 					$filedest = $upload_dir.'/'.$filename;
-					
+					// move the file from temp dir to final file path
 					move_uploaded_file( $filetmp, $filedest );
 					
 				}
@@ -136,17 +158,6 @@ add_shortcode( 'traj-galerialaudos-user', array( 'GaleriaLaudos', 'loadUserInter
 // Shortcode for admin interface
 add_shortcode( 'traj-galerialaudos-admin', array( 'GaleriaLaudos', 'loadAdminInterface' ) );
 // Action to load jQuery script
-
-/*
- * 
- */
-function loadScript() {
-	// Register the script for the plugin
-	wp_register_script( 'multiple-uploads', plugins_url( '/js/multiple-uploads.js', __FILE__ ), array( 'jquery' ) );
-	// Enqueue the script
-	wp_enqueue_script( 'multiple-uploads' );
-	
-}
-add_action( 'wp_enqueue_scripts', 'loadScript' );
+add_action( 'wp_enqueue_scripts', array( 'GaleriaLaudos', 'loadScript' ) );
 
 ?>
