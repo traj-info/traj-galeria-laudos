@@ -12,6 +12,9 @@ class GaleriaLaudos {
 	
 	const allowedMimeTypes = 'image/jpeg,image/gif,video/x-flv';
 	const maxFileSize = 10485760;
+	const nomeInputError = 'O nome deve conter apenas letras.';
+	const matriculaInputError = 'A matricula deve conter apenas numeros.';
+	const tituloInputError = 'O titulo deve conter apenas letras e/ou numeros.';
 	
 	/*
 	 * 
@@ -37,7 +40,7 @@ class GaleriaLaudos {
 			$currentPageURL = get_permalink();
 			
 			echo (
-				"<div class='galerialaudos_options_list'>
+				"<div class='traj_menu'>
 					<ul>
 						<li><a href='#' >Cadastrar exame</a></li>
 							<ul>
@@ -50,33 +53,39 @@ class GaleriaLaudos {
 				</div>"
 			);
 			
+			// checking if form has already been sent
 			if ( isset( $_POST['create_laudo'] ) ) {
 							
 				$dataHora = current_time('mysql');
 				
 				if ( !isset( $_POST['paciente_id'] ) ) {
+					
 					$nomePaciente = $_POST['nome_paciente'];
+					if ( preg_match( '/[^a-z\s]/i', $nomePaciente ) == TRUE ) {
+						$inputErrors['nome'] = self::nomeInputError;
+					}
 					$matrPaciente = $_POST['matr_paciente'];
-					$wpdb->insert(
-						'traj_pacientes',
-						array(
-							'nome' => $nomePaciente,
-							'matricula' => $matrPaciente,
-							'datahora' => $dataHora,
-						)
+					if ( preg_match( '/[^0-9]/', $matrPaciente ) == TRUE ) {
+						$inputErrors['matricula'] = self::matriculaInputError;
+					}
+					$patientArr = array(
+						'nome' => $nomePaciente,
+						'matricula' => $matrPaciente,
+						'datahora' => $dataHora,
 					);
-					$pacienteID = $wpdb->insert_id;
-				} else {
-					$pacienteID = $_POST['paciente_id'];
-					$pacienteSelecionado = $wpdb->get_var("SELECT nome FROM traj_pacientes WHERE id = $pacienteID");
-				} 
+					
+				}
 				
 				$titulo = $_POST['titulo'];
-				$obsPaciente = $_POST['obs_paciente'];
-				$obsMedico = $_POST['obs_medico'];
+				if ( preg_match( '/[^0-9a-z\s]/i', $titulo ) == TRUE ) {
+					$inputErrors['titulo'] = self::tituloInputError;
+				}
+				
+				$obsPaciente = sanitize_text_field( $_POST['obs_paciente'] );
+				$obsMedico = sanitize_text_field( $_POST['obs_medico'] );
 				$senhas = array(
-					'senhaPaciente' => wp_generate_password(10, FALSE),
-					'senhaMedico' => wp_generate_password(10, FALSE),
+					'senhaPaciente' => wp_generate_password(8, FALSE),
+					'senhaMedico' => wp_generate_password(8, FALSE),
 				);
 				
 				$arquivos = GaleriaLaudos::processUploads( explode( ',', self::allowedMimeTypes ), self::maxFileSize );
@@ -85,10 +94,25 @@ class GaleriaLaudos {
 				}
 																													# @todo estudar sanitize_text_field();
 																													# @todo estudar esc_textarea();
+				
+				if ( !empty( $inputErrors ) ) {
+					echo "<p class='msg_on_failure' id='unsuccessful_exam_create' >Por favor, corrija os erros demonstrados abaixo.</p>";
+					$disableSubmit = FALSE;
+				} else {
 					
-				$wpdb->insert( 
-					'traj_exames', 
-					array( 
+					if ( isset( $_POST['paciente_id'] ) ) {
+					
+						$pacienteID = $_POST['paciente_id'];
+						$pacienteSelecionado = $wpdb->get_var("SELECT nome FROM traj_pacientes WHERE id = $pacienteID");
+					
+					} else {
+					
+						$wpdb->insert( 'traj_pacientes', $patientArr );
+						$pacienteID = $wpdb->insert_id;
+					
+					}
+					
+					$examArr = array( 
 						'paciente_id' => $pacienteID,
 						'titulo' => $titulo,
 						'obs_paciente' => $obsPaciente,
@@ -97,104 +121,78 @@ class GaleriaLaudos {
 						'senha_medico' => $senhas['senhaMedico'],
 						'datahora_criacao' => $dataHora,
 						'arquivos' => $arquivos,
-					), 
-					array( 
-						'%d',
-						'%s',
-						'%s',
-						'%s',
-						'%s',
-						'%s',
-						'%s',
-						'%s',
-						'%s',
-					) 
-				);
+					);
+					
+					$wpdb->insert( 
+						'traj_exames', 
+						$examArr, 
+						array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', )
+					);
 				
-				echo "<p class='msg_on_success' id='successful_exam' >Exame cadastrado com sucesso! Veja os detalhes abaixo:</p>";
+					echo "<p class='msg_on_success' id='successful_exam_create' >Exame cadastrado com sucesso! Veja os detalhes abaixo:</p>";
+			
+					echo (
+						"<div class='passwords' id='display_passwords'>
+							<p>
+								Senha do medico: ".$senhas['senhaMedico'].
+							"</p>
+							<p>
+								Senha do paciente: ".$senhas['senhaPaciente'].
+							"</p>
+						</div>"
+					);
+					
+					$disableSubmit = TRUE;
+				
+				}
 				
 			}
-	
-			$formTop =		"<div class='galerialaudos_forms' id='create_laudo_form'>
-								<form method='POST' enctype='multipart/form-data' action=''>";
-			$formBottom = 	"	<fieldset>
-									<legend>Cadastro de exame</legend>
-									<p>
-										<label for='title'>Título:</label>
-										<input type='text' name='titulo' id='laudo_title' value='$titulo' />
-									</p>
-									<p>
-										<label for='obs_medico'>Anotações para o médico:</label>
-										<textarea name='obs_medico' id='obs_medico'>$obsMedico</textarea>
-									</p>
-									<p>
-										<label for='obs_paciente'>Anotações para a paciente:</label>
-										<textarea name='obs_paciente' id='obs_paciente'>$obsPaciente</textarea>
-									</p>
-		    						<div class='file_upload' id='file1'><input name='file[]' type='file'/>1</div>
-		    						<div id='file_tools'>
-		        						<div id='add_file'>Adicionar</div>
-		       	 						<div id='del_file'>Remover</div>
-		    						</div>
-								</fieldset>
-								<input type='submit' name='create_laudo' value='Enviar' ";
-			// disable submit button if form has already been sent
-			if ( isset( $_POST[ 'create_laudo' ] ) ) 
-				$formBottom .= "disabled='disabled' ";
-			$formBottom .= "/>
-								</form>
-							</div>";
-			if ( !empty( $senhas ) ) {
-				
-				$displayPasswords = "<div class='passwords' id='display_passwords'>
-										<p>
-											Senha do médico: ".$senhas['senhaMedico'].
-										"</p>
-										<p>
-											Senha do paciente: ".$senhas['senhaPaciente'].
-										"</p>
-									</div>";
-									
-			}		
+			
+			// let's cast our exam array to a new object so that we can use it as param in getForm() to construct our forms
+			$examArr = (OBJECT) $examArr;
 				
 			switch ( $_GET['new_exam'] ) {
 								
 				case 'new_patient':
-					echo (
-							"$displayPasswords
-							$formTop
-								<fieldset>
-									<legend>Cadastro de paciente</legend>
-									<p>
-										<label for='nome_paciente'>Nome:</label>
-										<input type='text' name='nome_paciente' id='nome_paciente' value='$nomePaciente' />
-									</p>
-									<p>
-										<label for='matr_paciente'>Matrícula:</label>
-										<input type='text' name='matr_paciente' id='matr_paciente' value='$matrPaciente' />
-									</p>
-								</fieldset>
-							$formBottom"
+					
+					$inputCreatePatient = (
+						"<fieldset>
+							<legend>Cadastro de paciente</legend>
+							<p>
+								<label for='nome_paciente'>Nome:</label>
+								<input type='text' name='nome_paciente' id='nome_paciente' value='$nomePaciente' /><span class='input_error' id='titulo_error'>".$inputErrors['nome']."</span>
+							</p>
+							<p>
+								<label for='matr_paciente'>Matrícula:</label>
+								<input type='text' name='matr_paciente' id='matr_paciente' value='$matrPaciente' /><span class='input_error' id='titulo_error'>".$inputErrors['matricula']."</span>
+							</p>
+						</fieldset>"
 					);
+					// this will tell if form has actually been sent
+					$inputCreatePatient .= "<input type='hidden' name='create_laudo' value='set' />";
+					
+					$formNew = self::getForm( 'createnew_laudo_form', $disableSubmit, $examArr, $inputCreatePatient, $inputErrors ); 
+					
+					echo $formNew;
+					
 					break;
 				
 				case 'select_patient':
 					// constructing select dropdown menu...
-					$pacientes = $wpdb->get_results( 'SELECT id, nome FROM traj_pacientes', OBJECT_K);
+					$pacientes = $wpdb->get_results( 'SELECT id, nome FROM traj_pacientes', OBJECT_K );
 					 
 					if ( !isset( $pacienteSelecionado ) ) {
-						$dropdownList = GaleriaLaudos::getDropdownList( $pacientes );
+						$inputSelectPatient = GaleriaLaudos::getDropdownList( $pacientes );
 					} else {
-						$dropdownList = GaleriaLaudos::getDropdownList( $pacientes, $pacienteSelecionado );
+						$inputSelectPatient = GaleriaLaudos::getDropdownList( $pacientes, $pacienteSelecionado );
 					}
+					// this will tell if form has actually been sent
+					$inputSelectPatient .= "<input type='hidden' name='create_laudo' value='set' />";
 					
-					// echo final form
-					echo (
-						"$displayPasswords
-						$formTop
-						$dropdownList
-						$formBottom"
-					);							
+					$formSelect = self::getForm( 'createselect_laudo_form', $disableSubmit, $examArr, $inputSelectPatient, $inputErrors );
+					
+					echo $formSelect;
+												
 					break;
 					
 				default:
@@ -204,7 +202,7 @@ class GaleriaLaudos {
 			
 			if ( isset( $_GET['edit_exam'] ) ) {
 				
-				$pacientes = $wpdb->get_results( 'SELECT id, nome FROM traj_pacientes', OBJECT_K);
+				$pacientes = $wpdb->get_results( 'SELECT id, nome FROM traj_pacientes', OBJECT_K );
 				
 				$form = "<form method='GET' enctype='multipart/form-data' action=''>";
 				$form .= "	<input type='hidden' name='page_id' value='".$post->ID."' />";
@@ -223,24 +221,81 @@ class GaleriaLaudos {
 						
 						} else {
 							
-							$pacienteID = preg_replace('/[^-0-9]/', '', $_GET['paciente_id'] );
+							$pacienteID = preg_replace('/[^0-9]/', '', $_GET['paciente_id'] );
 							
 							if ( array_key_exists( $pacienteID, $pacientes ) ) {
 								
-								$exams = $wpdb->get_results( "SELECT * FROM traj_exames WHERE paciente_ID = $pacienteID" );
+								$exams = $wpdb->get_results( "SELECT * FROM traj_exames WHERE paciente_ID = $pacienteID", OBJECT_K );
 								
 								$table = "<table class='traj_table' id'traj_table_exams' >";
 								$table .= "<tr><th>Exame</th><th>Criado em</th><th>Modificado em</th><th>Editar</th><th>Excluir</th></tr>";
 								
 								foreach ( $exams as $exam ) {
-	
-									$table .= "<tr><td>".$exam->titulo."</td><td>".$exam->datahora_criacao."</td><td>".$exam->datahora_modificacao."</td><td class='traj_table_editrow'>editar</td><td class='traj_table_delrow'>deletar</td></tr>";
+									
+									$table .= "<tr><td>".$exam->titulo."</td><td>".$exam->datahora_criacao."</td><td>".$exam->datahora_modificacao."</td>";
+									$table .= "<td class='traj_table_editrow'><a href='$currentPageURL&edit_exam=change_details&paciente_id=".$pacienteID."&exame_id=".$exam->id."&option=edit'>editar</a></td>";
+									$table .= "<td class='traj_table_delrow'><a href='$currentPageURL&edit_exam=change_details&paciente_id=".$pacienteID."&exame_id=".$exam->id."&option=delete' class='confirm_deletion'>deletar</a></td></tr>";
 									
 								}
 								
 								$table .= "</table>";
 								
-								echo $table;
+								if( !isset( $_GET['exame_id'] ) ) {
+									
+									echo "<p class='msg' id='exame_de' >Exames de " . $pacientes[$pacienteID]->nome . "</p>";
+									echo $table;
+								
+								} else {
+									// make sure the passed param has only numbers and nothing else
+									$exameID = preg_replace( '/[^0-9]/', '', $_GET['exame_id'] );	
+									// what does the user want to do with this exam?
+									switch ( $_GET['option'] ) {
+										// in case he wants to edit the exam...
+										case 'edit':
+											// hidden input to post the form
+											$inputEditLaudo = "<input type='hidden' name='edit_laudo' value='set' />";
+											// reset input errors array 
+											$inputErrors = array();
+											// validate 'titulo' input field
+											if ( preg_match( '/[^0-9a-z\s]/i', $_POST['titulo'] ) == TRUE ) {
+												$inputErrors['titulo'] = self::tituloInputError;
+											}
+											// check if form has not been sent yet or if there were input errors
+											if ( !isset( $_POST['edit_laudo'] ) || !empty( $inputErrors ) ) {
+												// form has not been sent yet, so let's do it
+												echo self::getForm( 'edit_laudo_form', $disableSubmit=FALSE, $exams[$exameID], $inputEditLaudo, $inputErrors );
+													
+											} else {
+												// form has been sent and there were no input errors... time to sanitize text field inputs
+												$obsMedico = sanitize_text_field( $_POST['obs_medico'] );
+												$obsPaciente = sanitize_text_field( $_POST['obs_paciente'] );
+												
+												if ( $wpdb->update( 'traj_exames', array( 'titulo' => $_POST['titulo'], 'obs_medico' => $obsMedico, 'obs_paciente' => $obsPaciente, 'datahora_modificacao' => current_time('mysql') ), array( 'id' => $exameID ) ) )
+													echo "<p class='msg_on_success' id='successful_exam_edit' >Exame editado com sucesso!</p>";
+												else
+													echo "<p class='msg_on_failure' id='unsuccessful_exam_edit' >Não foi possível atualizar os dados do exame. Contate o administrador do sistema.</p>";
+		
+											}
+											
+											break;
+										// in case he wants to delete the exam...	
+										case 'delete':
+											// check if deletion has been performed...
+											if ( $wpdb->delete('traj_exames', array( 'id' => $exameID ) ) ) { 								# was he really sure he meant to do that....... trimmmmmm trajettoria gets a call
+												echo "<p class='msg_on_success' id='successful_exam_delete' >Exame deletado com sucesso!</p>";
+											// nothing has been touched!
+											} else {
+												echo "<p class='msg_on_failure' id='unsuccessful_exam_delete' >Não foi possível deletar o exame. Contate o administrador do sistema.</p>";
+											}
+										
+											break;
+										
+										default:
+											
+											break;
+									}
+
+								}
 								
 							}
 							
@@ -256,7 +311,7 @@ class GaleriaLaudos {
 							
 						} else {
 							
-							$pacienteID = preg_replace('/[^-0-9]/', '', $_GET['paciente_id'] );
+							$pacienteID = preg_replace( '/[^-0-9]/', '', $_GET['paciente_id'] );
 							
 							if ( array_key_exists( $pacienteID, $pacientes ) ) {
 								
@@ -287,21 +342,22 @@ class GaleriaLaudos {
 									foreach ( $examIDs as $examID ) {
 										
 										$senhas = array(
-											'senha_paciente' => wp_generate_password(10, FALSE),
-											'senha_medico' => wp_generate_password(10, FALSE),
+											'senha_paciente' => wp_generate_password(8, FALSE),
+											'senha_medico' => wp_generate_password(8, FALSE),
 										);
 										
-										$wpdb->update('traj_exames', $senhas, array( id => $examID ) );
+										$wpdb->update( 'traj_exames', $senhas, array( id => $examID ) );
 										
 									}
 									
 									echo "<p class='msg_on_success' id='successfull_pw_change'>Novas senhas geradas com sucesso!</p>";	
 									
-									foreach ($exams as $exam) {
+									foreach ( $exams as $exam ) {
 											
 										if( in_array( $exam->id, $examIDs ) ) {
 											echo (
-												"<ul class='msg_on_success' id='successful_pw_change_list' >
+												"<p class='msg_on_success' id='successful_pw_change_examtitle'>".$exam->titulo."</p>
+												<ul class='msg_on_success' id='successful_pw_change_list' >
 													<li>Senha para o médico: " . $exam->senha_medico . "</li>
 													<li>Senha para o paciente: " . $exam->senha_paciente . "</li>
 												</ul>"
@@ -332,9 +388,57 @@ class GaleriaLaudos {
 	}
 	
 	/*
+	 * getForm
+	 * 
+	 * - required $formID string ( the html id property for the div which will wrap the form )
+	 * - required $disableSubmit boolean ( if true, submit button will be disabled. If false, it stays enabled )
+	 * - optional $valuesObj object ( an object which methods return strings. Use this to access pre-defined values for 'titulo', 'obs_medico' and 'obs_paciente' input fields )
+	 * - optional $customInput string ( use this if you want to have custom input fields )
+	 * - optional $inputErrors array ( use this to span input errors or maybe recommendations for the fields )
+	 * 
+	 * - return string with the form
+	 */
+	public static function getForm( $formID, $disableSubmit, $valuesObj="", $customInput="", $inputErrors="" ) {
+		
+		$form = "<div class='traj_form' id='$formID'>
+					<form method='POST' enctype='multipart/form-data' action=''>";
+		$form .= $customInput;
+		$form .= "		<fieldset>
+							<legend>Cadastro de exame</legend>
+							<p>
+								<label for='title'>Título:</label>
+								<input type='text' name='titulo' id='laudo_title' value='$valuesObj->titulo' /><span class='input_error' id='titulo_error'>".$inputErrors['titulo']."</span>
+							</p>
+							<p>
+								<label for='obs_medico'>Anotações para o médico:</label>
+								<textarea name='obs_medico' id='obs_medico'>$valuesObj->obs_medico</textarea>
+							</p>
+							<p>
+								<label for='obs_paciente'>Anotações para a paciente:</label>
+								<textarea name='obs_paciente' id='obs_paciente'>$valuesObj->obs_paciente</textarea>
+							</p>
+	    					<div class='file_upload' id='file1'><input name='file[]' type='file'/>1</div>
+	    					<div id='file_tools'>
+	        					<div id='add_file'>Adicionar</div>
+	        						<div id='del_file'>Remover</div>
+	    					</div>
+						</fieldset>
+						<input type='submit' value='Enviar' ";
+		if ( $disableSubmit === TRUE ) {
+			$form .= "disabled='disabled'";
+		}
+		$form .= "/>
+					</form>
+				</div>";
+		
+		return $form;
+		
+	}
+	
+	/*
 	 * getDropdownList
 	 * 
-	 * - required $queryResults string ( database query results to populate the dropdown list )
+	 * - required $queryResults object ( database query results to populate the dropdown list )
 	 * - optional $selectedOption string ( the first option to show in the dropdown list. Default is 'Selecione...' )
 	 * 
 	 * - construct a dropdown list from a database query to be used in a form
@@ -379,11 +483,17 @@ class GaleriaLaudos {
 	 * - register javascript/jquery scripts to be used by the plugin
  	 */
 	public static function loadScript() {
-		// Register the script for the plugin
+		// Register the scripts for the plugin
 		wp_register_script( 'multiple-uploads', plugins_url( '/js/multiple-uploads.js', __FILE__ ), array( 'jquery' ) );
-		// Enqueue the script
+		wp_register_script( 'dialog-box', plugins_url( '/js/dialog-box.js', __FILE__ ), array( 'jquery-ui-dialog', 'jquery-ui-core', 'jquery-ui-tabs' ) );
+		// Enqueue the scripts
 		wp_enqueue_script( 'multiple-uploads' );
+		wp_enqueue_script( 'dialog-box' );
 	
+	}
+	
+	public static function loadStyle() {
+		wp_enqueue_style('jquery-style', 'http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/themes/smoothness/jquery-ui.css');
 	}
 	
 	/*
@@ -466,7 +576,54 @@ class GaleriaLaudos {
 	 */
 	public static function loadUserInterface() {
 		
+		global $wpdb;
 		
+		$currentPageURL = get_permalink();
+		
+		$inputErrors = array();
+		
+		$matricula = $_POST['matricula_input'];
+		$senha = $_POST['senha_input'];
+		
+		$result = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(id) as total FROM traj_pacientes WHERE matricula = $matricula" ) );
+		if( $result['total'] == 0 ) {
+			$inputErrors['matricula'] = "<p class='msg_on_failure' id='wrong_matricula'>A matricula digitada nao existe. Por favor, tente novamente.</p>";
+		}
+
+		/*
+		 * modificar
+		$exame = $wpdb->get_var( "SELECT id FROM traj_exames WHERE paciente_id = $pacienteID AND ( senha_paciente = $senha OR senha_medico = $senha )"  );
+		if ( $exame === FALSE ) {
+			$inputErrors['senha'] = "<p class='msg_on_failure' id='wrong_password'></p>";
+		}
+		*/
+		
+		if ( !isset( $_POST['submit'] ) || !empty( $inputErrors ) )  {
+			
+			foreach ( $inputErrors as $error ) {
+				echo $error;
+			}
+			
+			echo (
+				"<div>
+					<p class='msg' id='confirm_user'>Entre com a matricula do paciente e a senha associada ao exame para poder visualizar os dados do mesmo.</p>
+					<form method='POST' enctype='multipart/form-data' action=''>
+						<input type='hidden' name='submit' value='set' />
+						<input type='text' name='matricula_input' id='traj_matricula_input' />
+						<input type='password' name='password_input' id='traj_password_input' />
+						<input type='submit' value='Ok' />
+					</form>
+				</div>"
+			);
+			
+		} else {
+			
+			$exame = $wpdb->get_row( "SELECT * FROM traj_exames WHERE id = $pacienteID", OBJECT_K );
+			echo $pacienteID;
+			echo $exame;
+			echo "tudo certo";
+			
+		}
 		
 	}
 	
@@ -483,5 +640,7 @@ add_shortcode( 'traj-galerialaudos-user', array( 'GaleriaLaudos', 'loadUserInter
 add_shortcode( 'traj-galerialaudos-admin', array( 'GaleriaLaudos', 'loadAdminInterface' ) );
 // Action to load jQuery script
 add_action( 'wp_enqueue_scripts', array( 'GaleriaLaudos', 'loadScript' ) );
+
+add_action( 'wp_enqueue_styles', array( 'GaleriaLaudos', 'loadStyle' ) );
 
 ?>
