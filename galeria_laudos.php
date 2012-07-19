@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Galeria de Laudos Medicos
+Plugin Name: Galeria de Laudos Médicos
 Plugin URI: http://www.trajettoria.com
 Description: Plugin para controle e exibicao de laudos medicos para medicos e pacientes
 Author: Renato Zuma Bange
@@ -13,8 +13,8 @@ class GaleriaLaudos {
 	const allowedMimeTypes = 'image/jpeg,image/gif,video/x-flv';
 	const maxFileSize = 10485760;
 	const nomeInputError = 'O nome deve conter apenas letras.';
-	const matriculaInputError = 'A matricula deve conter apenas numeros.';
-	const tituloInputError = 'O titulo deve conter apenas letras e/ou numeros.';
+	const matriculaInputError = 'A matrícula deve conter apenas números.';
+	const tituloInputError = 'O título deve conter apenas letras e/ou números.';
 	
 	/*
 	 * 
@@ -493,7 +493,8 @@ class GaleriaLaudos {
 	}
 	
 	public static function loadStyle() {
-		wp_enqueue_style('jquery-style', 'http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/themes/smoothness/jquery-ui.css');
+		wp_register_style('jquery-ui-css', 'http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/themes/smoothness/jquery-ui.css', TRUE );
+		wp_enqueue_style( 'jquery-ui-css' );
 	}
 	
 	/*
@@ -582,21 +583,23 @@ class GaleriaLaudos {
 		
 		$inputErrors = array();
 		
-		$matricula = $_POST['matricula_input'];
-		$senha = $_POST['senha_input'];
+		if ( isset( $_POST['submit'] ) ) {
 		
-		$result = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(id) as total FROM traj_pacientes WHERE matricula = $matricula" ) );
-		if( $result['total'] == 0 ) {
-			$inputErrors['matricula'] = "<p class='msg_on_failure' id='wrong_matricula'>A matricula digitada nao existe. Por favor, tente novamente.</p>";
+			$matricula = $_POST['matricula_input'];
+			$senha = $_POST['senha_input'];
+			
+			$result = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(id) as totalPatients FROM traj_pacientes WHERE matricula = $matricula" ) );
+			if( $result['totalPatients'] == 0 ) {
+				$inputErrors['matricula'] = "<p class='msg_on_failure' id='wrong_matricula'>A matricula digitada nao existe. Por favor, tente novamente.</p>";
+			} else {
+				$pacienteID = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM traj_pacientes WHERE matricula = $matricula" ) );
+				$result = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(id) as totalExams FROM traj_exames WHERE paciente_id = $pacienteID AND ( senha_paciente = '$senha' OR senha_medico = '$senha' )" ) );
+				if ( $result['totalExams'] == 0 ) {
+					$inputErrors['senha'] = "<p class='msg_on_failure' id='wrong_senha'>A senha digitada nao corresponde a nenhum exame cadastrado para essa matricula. Por favor, tente novamente.</p>";
+				}
+			}
+			
 		}
-
-		/*
-		 * modificar
-		$exame = $wpdb->get_var( "SELECT id FROM traj_exames WHERE paciente_id = $pacienteID AND ( senha_paciente = $senha OR senha_medico = $senha )"  );
-		if ( $exame === FALSE ) {
-			$inputErrors['senha'] = "<p class='msg_on_failure' id='wrong_password'></p>";
-		}
-		*/
 		
 		if ( !isset( $_POST['submit'] ) || !empty( $inputErrors ) )  {
 			
@@ -606,22 +609,87 @@ class GaleriaLaudos {
 			
 			echo (
 				"<div>
-					<p class='msg' id='confirm_user'>Entre com a matricula do paciente e a senha associada ao exame para poder visualizar os dados do mesmo.</p>
+					<p class='msg' id='confirm_user'>Entre com a matrícula do paciente e a senha associada ao exame para poder visualizar os dados do mesmo.</p>
 					<form method='POST' enctype='multipart/form-data' action=''>
 						<input type='hidden' name='submit' value='set' />
-						<input type='text' name='matricula_input' id='traj_matricula_input' />
-						<input type='password' name='password_input' id='traj_password_input' />
-						<input type='submit' value='Ok' />
+						<p>
+							<label for='traj_matricula_input'>Matrícula:</label>
+							<input type='text' name='matricula_input' id='traj_matricula_input' />
+						</p>
+						<p>
+							<label for='traj_password_input'>Senha:</label>
+							<input type='password' name='senha_input' id='traj_password_input' />
+						</p>
+						<input type='submit' value='ok' />
 					</form>
 				</div>"
 			);
 			
 		} else {
 			
-			$exame = $wpdb->get_row( "SELECT * FROM traj_exames WHERE id = $pacienteID", OBJECT_K );
-			echo $pacienteID;
-			echo $exame;
-			echo "tudo certo";
+			$exame = $wpdb->get_row( "SELECT * FROM traj_exames WHERE paciente_id = $pacienteID AND ( senha_paciente = '$senha' OR senha_medico = '$senha' )" );
+			// exam title
+			echo "<h2 class='traj_exam_title'>".$exame->titulo."</h2>";
+			// if there are any related files...
+			if ( !empty( $exame->arquivos ) ) {
+				// rebuild files array
+				$arquivos = explode( ',', $exame->arquivos );
+				// iterate over files to separate them by type
+				foreach ( $arquivos as $filename ) {
+					// check file type
+					$filetype = wp_check_filetype( $filename );
+					// if it's a video
+					if ( $filetype['ext'] == 'flv' ) {
+						$videos[] = $filename;
+					// else it's an image
+					} else {
+						$images[] = $filename;	
+					}
+				}
+				// if there's at least one video and the video player function exists
+				if ( !empty( $videos ) && function_exists('hana_flv_player_template_call') ) {
+					// title for the video galery
+					echo "<h3 class='traj_exam_files'>Vídeos do exame</h3>";
+					// time to display the videos!
+					foreach ( $videos as $vid ) {
+						// configure video thumbs here
+						$hana_arg="
+						video='".plugins_url( "/uploads/$vid", __FILE__ )."'
+						player='2'
+						width='220'
+						height='150'
+						more_2=\"showStopButton: true, showScrubber: true, showVolumeSlider: false,showMuteVolumeButton: true, 
+						showFullScreenButton: true, showMenu: false, controlsOverVideo: 'locked',controlBarBackgroundColor: -1,
+						controlBarGloss: 'none', usePlayOverlay:true \"
+						";
+						echo "<div class='traj_video_thumbs'>".hana_flv_player_template_call($hana_arg)."</div>";
+						
+					}
+	
+				}
+				// if there's at least one image
+				if ( !empty( $images ) ) {
+					// title for the image galery
+					echo "<h3 class='traj_exam_files'>Imagens do exame</h3>";
+					// time to display the images!
+					foreach ( $images as $img ) {
+						// configure image thumbs here
+						echo "<a href='".plugins_url( "/uploads/$img", __FILE__ )."' rel='wp-video-lightbox'><img class='traj_image_thumbs' height='150' src='".plugins_url( "/uploads/$img", __FILE__ )."' /></a>";
+					}
+					
+				}
+				
+			}
+			// if user is the patient
+			if ( $senha == $exame->senha_paciente ) {
+				
+				echo "<p class='traj_exam_obs' id='traj_obs_paciente'>".$exame->obs_paciente."</p>";
+			// else, he is the medic
+			} else {
+				
+				echo "<p class='traj_exam_obs' id='traj_obs_medico'>".$exame->obs_medico."</p>";
+				
+			}
 			
 		}
 		

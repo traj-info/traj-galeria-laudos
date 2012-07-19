@@ -1,4 +1,16 @@
-﻿v0.3.0
+﻿v0.9.0 ********** versão final de testes do plugin ***********
+- interface de usuário agora funcional
+- o plugin passa a depender de outros 2 plugins para melhorar a experiência do usuário: hana-flv-player(videos) e wp_video_lightbox(imagens).
+- corrigido charset do eclipse... acentos devolvidos para as palavras
+@knownbugs
+- alfabeto latino não passa na validação dos campos (pesquisar regex apropriada)
+- dialog box sem estilo (pesquisar como carregar estilo para script jquery)
+- alguns símbolos que deveriam ser removidos são ignorados na limpeza do nome do arquivo pela função wp_sanitize_filename()
+@todo
+- deletar do servidor os arquivos associados ao exame que o usuário deleta
+- mostrar arquivos associados ao exame (se existirem) na tela de edição do exame, junto com opção para deletá-los
+
+v0.3.0
 - mensagens de erro de input definidas como constantes para facilitar customização posterior
 - todo o painel de controle do administrador está agora funcional
 - parte do 'cadastrar exame' teve que ser reescrita para implementar a validação de todos os input's
