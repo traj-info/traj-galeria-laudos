@@ -1,4 +1,15 @@
-﻿v0.9.0 ********** versão final de testes do plugin ***********
+﻿v0.9.1
+- implementada (mas não testada) funcionalidade de mostrar arquivos associados ao exame (se existirem) na tela de edição, junto com opção para deletá-los
+- código melhor comentado
+@knownbugs
+- alfabeto latino não passa na validação dos campos (pesquisar regex apropriada)
+- dialog box sem estilo (pesquisar como carregar estilo para script jquery)
+- alguns símbolos que deveriam ser removidos são ignorados na limpeza do nome do arquivo pela função wp_sanitize_filename()
+- ao gerar novas senhas, as novas senhas mostradas para o administrador não batem com as novas gravadas no banco (erro de lógica, provavelmente está mostrando as senhas antigas)
+@todo
+- deletar do servidor os arquivos associados ao exame que o usuário deleta
+
+v0.9.0 ********** versão final de testes do plugin ***********
 - interface de usuário agora funcional
 - o plugin passa a depender de outros 2 plugins para melhorar a experiência do usuário: hana-flv-player(videos) e wp_video_lightbox(imagens).
 - corrigido charset do eclipse... acentos devolvidos para as palavras
