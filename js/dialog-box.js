@@ -4,12 +4,13 @@ jQuery(function() {
 
         e.preventDefault();
 
-        jQuery("<div>Ao deletar um exame, os arquivos associados também são deletados. Tem certeza que deseja prosseguir?</div>").dialog({
+        jQuery("<div>Tem certeza que deseja continuar? Todos os arquivos associados ao exame TAMBÉM serão deletados.</div>").dialog({
+			title: "Confirmar remoção de exame.",
             buttons: {
                 "Ok": function() {
                     window.location = link.href;
                 },
-                "Cancel": function() {
+                "Cancelar": function() {
                     jQuery(this).dialog("close");
                 }
             }
