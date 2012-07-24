@@ -1,4 +1,21 @@
-﻿v0.9.2
+﻿v0.9.3
+@implemented
+- funcionalidade 'pacientes cadastrados';
+	-- foi necessário adicionar o campo 'datahora_modificacao' e alterar o campo 'datahora' para 'datahora_criacao' na tabela traj_pacientes
+- colocar títulos nas páginas;
+- TinyMCE para campos text;
+	-- id's para os campos de texto tiveram que ser alterados para não causar malfuncionamento do tinyMCE
+	-- função getForm() precisou ser reestruturada: agora ela não retorna nada, apenas dá echo direto no formulário
+- mostrar thumbnail dos arquivos na edição de exame;
+- filtrar com strip_tags() as tags HTML permitidas nos campos text;
+- reorganizar name, class e id dos campos nos formulários e nas mensagens de erro;
+@toImplement
+- melhorar javascript do envio de arquivos: se não houver arquivo selecionado, não pode ser possível adicionar mais um campo de envio.
+@fixed
+@toFix
+- é possível que a reorganização das tags html tenha bugado algumas funções javascript (não testado)
+
+v0.9.2
 @implemented
 - funcionalidade para deletar do servidor os arquivos associados ao exame que o usuário deleta;
 - link na opção de menu "cadastrar exame" removido, pois não levaria a lugar nenhum;

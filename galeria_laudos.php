@@ -85,7 +85,7 @@ class GaleriaLaudos {
 					$patientArr = array(
 						'nome' => $nomePaciente,
 						'matricula' => $matrPaciente,
-						'datahora' => $dataHora,
+						'datahora_criacao' => $dataHora,
 					);
 					
 				} elseif ( $_POST['paciente_id'] == 'selecione' ) {
@@ -99,8 +99,8 @@ class GaleriaLaudos {
 					$inputErrors['titulo'] = self::inputIsEmpty;
 				}
 				
-				$obsPaciente = sanitize_text_field( $_POST['obs_paciente'] );
-				$obsMedico = sanitize_text_field( $_POST['obs_medico'] );
+				$obsPaciente = strip_tags( $_POST['obspaciente'], '<br><h4><p><a><b><strong><em><table><td><tr><th><ul><ol><li><del><ins>' );
+				$obsMedico = strip_tags( $_POST['obsmedico'], '<br><h4><p><a><b><strong><em><table><td><tr><th><ul><ol><li><del><ins>' );
 				if ( is_array( $_FILES['file'] ) && !empty( $_FILES['file'] ) ) {
 					$arquivos = @implode( ',', GaleriaLaudos::processUploads( explode( ',', self::allowedMimeTypes ), self::maxFileSize ) );
 				}
@@ -113,10 +113,11 @@ class GaleriaLaudos {
 					'senhaPaciente' => wp_generate_password(8, FALSE),
 					'senhaMedico' => wp_generate_password(8, FALSE),
 				);
-				
+				// make sure result message is initiated
+				$msg = '';
 				if ( !empty( $inputErrors ) ) {
-					echo "<p class='msg_on_failure' id='unsuccessful_exam_create' >Por favor, corrija os erros demonstrados abaixo.</p>";
-					echo "<span class='input_error' id='selected_error'>".$inputErrors['paciente']."</span>";
+					$msg = "<p class='traj_msg traj_msg-on-failure' id='traj_exam-create-fail' >Por favor, corrija os erros demonstrados abaixo.</p>";
+					$msg .= "<span class='traj_input-error' id='traj_selected-error'>".$inputErrors['paciente']."</span>";
 					$disableSubmit = FALSE;
 					$disabled = "";
 				} else {
@@ -151,11 +152,11 @@ class GaleriaLaudos {
 						$examArr, 
 						array( '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', )
 					);
-					// echo success msg
-					echo "<p class='msg_on_success' id='successful_exam_create' >Exame cadastrado com sucesso! Veja os detalhes abaixo:</p>";
-					// echo passwords for the new exam
-					echo (
-						"<div class='passwords' id='display_passwords'>
+					// prepare success msg
+					$msg = "<p class='traj_msg traj_msg-on-success' id='traj_exam-create-ok' >Exame cadastrado com sucesso! Veja os detalhes abaixo:</p>";
+					// passwords for the new exam
+					$msg .= (
+						"<div class='traj_pws' id='traj_display-pws-box'>
 							<p>
 								Senha do medico: ".$senhas['senhaMedico'].
 							"</p>
@@ -178,28 +179,39 @@ class GaleriaLaudos {
 			switch ( $_GET['new_exam'] ) {
 				// in case he wants to create a new patient for it
 				case 'new_patient':
+					// echo page title
+					echo "<h2 class='traj_page-title' id='traj_newpatient-title'>Cadastro de Exame Para Novo Paciente</h2>";
+					// echo success or failure message
+					echo $msg;	
 					// prepare a 'custom input' for getForm()
 					$inputCreatePatient = (
 						"<fieldset>
 							<legend>Cadastro de paciente</legend>
 							<p>
 								<label for='nome_paciente'>Nome:</label>
-								<input type='text' name='nome_paciente' id='nome_paciente' value='$nomePaciente' $disabled/><span class='input_error' id='titulo_error'>".$inputErrors['nome']."</span>
+								<input type='text' name='nome_paciente' id='traj_nome-input' value='$nomePaciente' $disabled/><span class='traj_input-error' id='traj_titulo-error'>".$inputErrors['nome']."</span>
 							</p>
 							<p>
 								<label for='matr_paciente'>Matrícula:</label>
-								<input type='text' name='matr_paciente' id='matr_paciente' value='$matrPaciente' $disabled/><span class='input_error' id='titulo_error'>".$inputErrors['matricula']."</span>
+								<input type='text' name='matr_paciente' id='traj_matr-input' value='$matrPaciente' $disabled/><span class='traj_input-error' id='traj_titulo-error'>".$inputErrors['matricula']."</span>
 							</p>
 						</fieldset>"
 					);
 					// this will later tell if form was sent
 					$inputCreatePatient .= "<input type='hidden' name='create_laudo' value='set' />";
 					// echo form with inputs for a new patient
-					echo self::getForm( 'createnew_laudo_form', $disableSubmit, $examArr, $inputCreatePatient, $inputErrors );
+					if ( $disableSubmit == TRUE )
+						self::getForm( 'createnew_laudo_form', TRUE, $examArr, $inputCreatePatient, $inputErrors );
+					else
+						self::getForm( 'createnew_laudo_form', FALSE, $examArr, $inputCreatePatient, $inputErrors );
 					
 					break;
 				// in case he wants to create the new exam for an existing patient
 				case 'select_patient':
+					// echo page title
+					echo "<h2 class='traj_page-title' id='traj_selectpatient-title'>Cadastro de Exame Para Paciente Existente</h2>";
+					// echo success or failure message
+					echo $msg;
 					// constructing select dropdown menu...
 					$pacientes = $wpdb->get_results( 'SELECT id, nome, matricula FROM traj_pacientes', OBJECT_K );
 					// if this is his first attempt to fill the form
@@ -214,8 +226,10 @@ class GaleriaLaudos {
 					// this will tell if form has actually been sent
 					$inputSelectPatient .= "<input type='hidden' name='create_laudo' value='set' />";
 					// echo form with a select dropdown list
-					echo self::getForm( 'createselect_laudo_form', $disableSubmit, $examArr, $inputSelectPatient, $inputErrors );
-												
+					if ( $disableSubmit == TRUE )
+						self::getForm( 'createselect_laudo_form', TRUE, $examArr, $inputSelectPatient, $inputErrors );
+					else
+						self::getForm( 'createselect_laudo_form', FALSE, $examArr, $inputSelectPatient, $inputErrors );
 					break;
 					
 				default:
@@ -237,6 +251,8 @@ class GaleriaLaudos {
 				switch ( $_GET['edit'] ) {
 					// in case he wants to change exam details
 					case 'exam':
+						// echo page title
+						echo "<h2 class='traj_page-title' id='traj_editexam-title'>Edição de Exame</h2>";
 						// check if form has been sent (using GET here should be a security risk, but he's an admin anyway and it makes for a much easier debug process)
 						if ( !isset( $_GET['paciente_id'] ) ) {
 							// let him select a patient
@@ -247,17 +263,19 @@ class GaleriaLaudos {
 							$pacienteID = preg_replace('/[^0-9]/', '', $_GET['paciente_id'] );
 							// another check to see if query string param matches an existing patient
 							if ( array_key_exists( $pacienteID, $pacientes ) ) {
+								if ( $_GET['redirected'] == 'yes' )
+									echo "<p class='traj_msg' id='traj_msg-redirected'>Você precisa deletar os exames relacionados ao paciente antes de removê-lo.</p>";
 								
 								$exams = $wpdb->get_results( "SELECT * FROM traj_exames WHERE paciente_ID = $pacienteID", OBJECT_K );
 								
-								$table = "<table class='traj_table' id'traj_table_exams' >";
+								$table = "<table class='traj_table' id'traj_table-exams' >";
 								$table .= "<tr><th>Exame</th><th>Criado em</th><th>Modificado em</th><th>Editar</th><th>Excluir</th></tr>";
 								
 								foreach ( $exams as $exam ) {
 									
 									$table .= "<tr><td>".$exam->titulo."</td><td>".self::mysqlToBR( $exam->datahora_criacao )."</td><td>".self::mysqlToBR( $exam->datahora_modificacao )."</td>";
-									$table .= "<td class='traj_table_editrow'><a href='$currentPageURL&edit=exam&paciente_id=".$pacienteID."&exame_id=".$exam->id."&option=edit'>editar</a></td>";
-									$table .= "<td class='traj_table_delrow'><a href='$currentPageURL&edit=exam&paciente_id=".$pacienteID."&exame_id=".$exam->id."&option=delete' class='confirm_deletion'>deletar</a></td></tr>";
+									$table .= "<td class='traj_table-editrow'><a href='$currentPageURL&edit=exam&paciente_id=".$pacienteID."&exame_id=".$exam->id."&option=edit'>editar</a></td>";
+									$table .= "<td class='traj_table-delrow'><a href='$currentPageURL&edit=exam&paciente_id=".$pacienteID."&exame_id=".$exam->id."&option=delete' class='traj_del-exam'>deletar</a></td></tr>";
 									
 								}
 								
@@ -265,7 +283,7 @@ class GaleriaLaudos {
 								
 								if( !isset( $_GET['exame_id'] ) ) {
 									
-									echo "<p class='traj_msg' id='exame_de' >Exames de " . $pacientes[$pacienteID]->nome . "</p>";
+									echo "<p class='traj_msg' id='traj_msg-exams-of' >Exames de " . $pacientes[$pacienteID]->nome . "</p>";
 									echo $table;
 								
 								} else {
@@ -279,17 +297,58 @@ class GaleriaLaudos {
 											$inputEditLaudo = "<input type='hidden' name='edit_laudo' value='set' />";
 											// checkbox input for old files (if there's any)... user might want to delete them
 											if ( !empty( $exams[$exameID]->arquivos ) ) {
-												$inputEditLaudo .= "<div class='traj_oldfiles' id='traj_delconfirm_box'>";
+												$inputEditLaudo .= "<div class='traj_oldfiles' id='traj_delconfirm-box'>";
 												$inputEditLaudo .= "<p class='traj_msg' id='traj_delconfirm'>Você pode deletar os arquivos do exame marcando-os abaixo (essa ação não pode ser revertida):</p>";
 												$oldFiles = explode( ',', $exams[$exameID]->arquivos );
-												foreach ( $oldFiles as $file ) {
+												foreach ( $oldFiles as $filename ) {
+													// check file type
+													$filetype = wp_check_filetype( $filename );
+													// if it's a video
+													if ( $filetype['ext'] == 'flv' ) {
+														$videos[] = $filename;
+													// else it's an image
+													} else {
+														$images[] = $filename;	
+													}
 
-													$inputEditLaudo .= "<p class='traj_checkbox'>";
-													$inputEditLaudo .= "<input type='checkbox' name='oldfile[]' value='".$file."' /> ".$file;
-													$inputEditLaudo .= "</p>";
+												}
+												// if there's at least one video and the video player function exists
+												if ( !empty( $videos ) && function_exists('hana_flv_player_template_call') ) {
+													// title for the video galery
+													$inputEditLaudo .= "<h3 class='traj_exam-files' id='traj_exam-videos'>Vídeos do exame</h3>";
+													// time to display the videos!
+													foreach ( $videos as $vid ) {
+														// configure video thumbs here
+														$hana_arg="
+														video='".plugins_url( "/uploads/$vid", __FILE__ )."'
+														player='2'
+														width='220'
+														height='150'
+														more_2=\"showStopButton: true, showScrubber: true, showVolumeSlider: false,showMuteVolumeButton: true, 
+														showFullScreenButton: true, showMenu: false, controlsOverVideo: 'locked',controlBarBackgroundColor: -1,
+														controlBarGloss: 'none', usePlayOverlay:true \"
+														";
+														
+														$inputEditLaudo .= "<input class ='traj_checkbox' type='checkbox' name='oldfile[]' value='".$vid."' /> ".hana_flv_player_template_call($hana_arg);
+														
+													}
+												}
+												
+												// if there's at least one image
+												if ( !empty( $images ) ) {
+													// title for the image galery
+													$inputEditLaudo .= "<h3 class='traj_exam-files' id='traj_exam-images'>Imagens do exame</h3>";
+													// time to display the images!
+													foreach ( $images as $img ) {
+														// configure image thumbs here
+														$inputEditLaudo .= "<input class ='traj_checkbox' type='checkbox' name='oldfile[]' value='".$img."' /><a href='".plugins_url( "/uploads/$img", __FILE__ )."' rel='wp-video-lightbox'><img class='traj_image-thumbs' height='150' src='".plugins_url( "/uploads/$img", __FILE__ )."' />";
+
+													}
 													
 												}
+
 												$inputEditLaudo .= "</div>";
+												
 											}
 											// reset input errors array 
 											$inputErrors = array();
@@ -300,12 +359,12 @@ class GaleriaLaudos {
 											// check if form has not been sent yet or if there were input errors
 											if ( !isset( $_POST['edit_laudo'] ) || !empty( $inputErrors ) ) {
 												// show form
-												echo self::getForm( 'edit_laudo_form', $disableSubmit=FALSE, $exams[$exameID], $inputEditLaudo, $inputErrors );
+												self::getForm( 'edit_laudo_form', FALSE, $exams[$exameID], $inputEditLaudo, $inputErrors );
 											// everything went fine...		
 											} else {
 												// sanitize text field inputs
-												$obsMedico = sanitize_text_field( $_POST['obs_medico'] );
-												$obsPaciente = sanitize_text_field( $_POST['obs_paciente'] );
+												$obsMedico = strip_tags( $_POST['obsmedico'], '<br><h4><p><a><b><strong><em><table><td><tr><th><ul><ol><li><del><ins>' );
+												$obsPaciente = strip_tags( $_POST['obspaciente'], '<br><h4><p><a><b><strong><em><table><td><tr><th><ul><ol><li><del><ins>' );
 												// if user has checked any existing file to be deleted
 												if ( is_array( $_POST['oldfile'] ) ) {
 													// delete files
@@ -332,9 +391,9 @@ class GaleriaLaudos {
 													$arquivos = substr($arquivos, 0, -1);
 												
 												if ( $wpdb->update( 'traj_exames', array( 'titulo' => $_POST['titulo'], 'obs_medico' => $obsMedico, 'obs_paciente' => $obsPaciente, 'datahora_modificacao' => current_time('mysql'), 'arquivos' => $arquivos ), array( 'id' => $exameID ) ) )
-													echo "<p class='msg_on_success' id='successful_exam_edit' >Exame editado com sucesso!</p>";
+													echo "<p class='traj_msg traj_msg-on-success' id='traj_exam-edit-ok' >Exame editado com sucesso!</p>";
 												else
-													echo "<p class='msg_on_failure' id='unsuccessful_exam_edit' >Não foi possível atualizar os dados do exame. Contate o administrador do sistema.</p>";
+													echo "<p class='traj_msg-on-failure' id='traj_exam-edit-fail' >Não foi possível atualizar os dados do exame. Contate o administrador do sistema.</p>";
 		
 											}
 											
@@ -354,10 +413,10 @@ class GaleriaLaudos {
 														
 													}
 												}
-												echo "<p class='msg_on_success' id='successful_exam_delete' >Exame deletado com sucesso!</p>";
+												echo "<p class='traj_msg-on-success' id='traj_exam-del-ok' >Exame deletado com sucesso!</p>";
 											// nothing has been touched!
 											} else {
-												echo "<p class='msg_on_failure' id='unsuccessful_exam_delete' >Não foi possível deletar o exame. Contate o administrador do sistema.</p>";
+												echo "<p class='traj_msg-on-failure' id='traj_exam-del-fail' >Não foi possível deletar o exame. Contate o administrador do sistema.</p>";
 											}
 
 											break;
@@ -376,17 +435,18 @@ class GaleriaLaudos {
 						break;
 					
 					case 'patient':
-						
+						// echo page title
+						echo "<h2 class='traj_page-title' id='traj_editpatient-title'>Edição de Paciente</h2>";
 						if( !isset( $_GET['patient_id'] ) ) {
 							
-							$patientsTable = "<table class='traj_table' id'traj_table_patients' >";
+							$patientsTable = "<table class='traj_table' id'traj_table-patients' >";
 							$patientsTable .= "<tr><th>Paciente</th><th>Matrícula</th><th>Editar</th><th>Excluir</th></tr>";
 							
 							foreach ( $pacientes as $patient ) {
 								
 								$patientsTable .= "<tr><td>".$patient->nome."</td><td>".$patient->matricula."</td>";
-								$patientsTable .= "<td class='traj_table_editrow'><a href='$currentPageURL&edit=patient&patient_id=".$patient->id."&option=edit'>editar</a></td>";
-								$patientsTable .= "<td class='traj_table_delrow'><a href='$currentPageURL&edit=patient&patient_id=".$patient->id."&option=delete' class='confirm_deletion'>deletar</a></td></tr>";
+								$patientsTable .= "<td class='traj_table-editrow'><a href='$currentPageURL&edit=patient&patient_id=".$patient->id."&option=edit'>editar</a></td>";
+								$patientsTable .= "<td class='traj_table-delrow'><a href='$currentPageURL&edit=patient&patient_id=".$patient->id."&option=delete' class='traj_del-patient'>deletar</a></td></tr>";
 								
 							}
 							
@@ -396,26 +456,93 @@ class GaleriaLaudos {
 							
 						} else {
 							
-							echo (
-								"<fieldset>
-									<legend>Edição de paciente</legend>
-									<p>
-										<label for='nome_paciente'>Nome:</label>
-										<input type='text' name='nome_paciente' id='nome_paciente' value='$nomePaciente' /><span class='input_error' id='titulo_error'>".$inputErrors['nome']."</span>
-									</p>
-									<p>
-										<label for='matr_paciente'>Matrícula:</label>
-										<input type='text' name='matr_paciente' id='matr_paciente' value='$matrPaciente' /><span class='input_error' id='titulo_error'>".$inputErrors['matricula']."</span>
-									</p>
-								</fieldset>"
-							);
+							$patientID = $_GET['patient_id'];
+							
+							switch ( $_GET['option'] ) {
+								case 'edit':
+									
+									if ( isset( $_POST['edit_patient'] ) ) {
+										// reset input errors array 
+										$inputErrors = array();
+										// validate user inputs
+										$nomePaciente = trim( $_POST['nome_paciente'] );
+										if ( preg_match( '/[^a-z\s\w]/iu', $nomePaciente ) == TRUE ) {
+											$inputErrors['nome'] = self::nomeInputError;
+										} elseif ( empty($nomePaciente) ) {
+											$inputErrors['nome'] = self::inputIsEmpty;
+										}
+										$matrPaciente = trim( $_POST['matr_paciente'] );
+										$result = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(id) as totalMatriculas FROM traj_pacientes WHERE matricula = $matrPaciente" ) );
+										if ( preg_match( '/[^0-9]/', $matrPaciente ) == TRUE ) {
+											$inputErrors['matricula'] = self::matriculaInputError;
+										} elseif ( $result['totalMatriculas'] != 0 && $matrPaciente != $pacientes[$patientID]->matricula ) {
+											$inputErrors['matricula'] = self::matriculaInputExists;
+										} elseif ( empty($matrPaciente) ) {
+											$inputErrors['matricula'] = self::inputIsEmpty;
+										}
+										$dataHora = current_time('mysql');
+										$patientArr = array(
+											'nome' => $nomePaciente,
+											'matricula' => $matrPaciente,
+											'datahora_modificacao' => $dataHora,
+										);
+									}
+									
+									if ( !isset( $_POST['edit_patient'] ) || !empty( $inputErrors ) ) {
+										echo (
+											"<form method='POST' enctype='multipart/form-data' action=''>
+												<fieldset>
+													<legend>Edição de paciente</legend>
+													<input type='hidden' name='edit_patient' value='set' />
+													<p>
+														<label for='nome_paciente'>Nome:</label>
+														<input type='text' name='nome_paciente' id='traj_nome-input' value='".$pacientes[$patientID]->nome."' /><span class='traj_input-error' id='traj_titulo-error'>".$inputErrors['nome']."</span>
+													</p>
+													<p>
+														<label for='matr_paciente'>Matrícula:</label>
+														<input type='text' name='matr_paciente' id='traj_matr-paciente' value='".$pacientes[$patientID]->matricula."' /><span class='traj_input-error' id='traj_titulo-error'>".$inputErrors['matricula']."</span>
+													</p>
+												</fieldset>
+												<input type='submit' value='Salvar alterações' />
+											</form>"
+										);
+									} else {
+										if ( $wpdb->update('traj_pacientes', $patientArr, array('id' => $_GET['patient_id'] ) ) )
+											echo "<p class='traj_msg-on-success' id='traj_patient-edit-ok' >Paciente editado com sucesso!</p>";
+										else
+											echo "<p class='traj_msg-on-failure' id='traj_patient-edit-fail' >Não foi possível atualizar os dados do paciente. Contate o administrador do sistema.</p>";
+									}
+									break;
+								
+								case 'delete':
+									// if there are no exam related to the patient, we can delete him
+									$result = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(id) AS totalExams FROM traj_exames WHERE paciente_id = $patientID" ) );
+									if ( $result['totalExams'] == 0 ) {	
+										if( $wpdb->delete('traj_pacientes', array( 'id' => $patientID ) ) )
+											echo "<p class='traj_msg-on-success' id='traj_patient-del-ok' >Paciente deletado com sucesso!</p>";
+										else
+											echo "<p class='traj_msg-on-failure' id='traj_patient-del-fail' >Não foi possível deletar o paciente. Contate o administrador do sistema.</p>";
+									// otherwise, redirect user because he must delete related exams first
+									} else {
+										$location = $currentPageURL."&edit=exam&paciente_id=".$patientID."&redirected=yes";
+										echo "<meta http-equiv='refresh' content='0;url=$location' />";
+										exit;
+									}
+									
+									break;
+								
+								default:
+									
+									break;
+							}
 							
 						}
 							
 						break;	
 						
 					case 'pws':
-						
+						// echo page title
+						echo "<h2 class='traj_page-title' id='traj_editpws-title'>Alteração de Senhas</h2>";
 						if ( !isset( $_GET['paciente_id'] ) ) {
 							
 							echo $form;
@@ -461,14 +588,14 @@ class GaleriaLaudos {
 										
 									}
 									
-									echo "<p class='msg_on_success' id='successfull_pw_change'>Novas senhas geradas com sucesso!</p>";	
+									echo "<p class='traj_msg traj_msg-on-success' id='traj_pw-change-ok'>Novas senhas geradas com sucesso!</p>";	
 									
 									foreach ( $exams as $exam ) {
 											
 										if( in_array( $exam->id, $examIDs ) ) {
 											echo (
-												"<p class='msg_on_success' id='successful_pw_change_examtitle'>".$exam->titulo."</p>
-												<ul class='msg_on_success' id='successful_pw_change_list' >
+												"<p class='traj_msg traj_msg-on-success traj_msg-title' id='traj_pw-".$exam->titulo."-title' >".$exam->titulo."</p>
+												<ul class='traj_msg traj_msg-on-success traj_msg-list' id='traj_pw-".$exam->titulo."-list' >
 													<li>Senha para o médico: " . $senhas[$exam->id]['senha_medico'] . "</li>
 													<li>Senha para o paciente: " . $senhas[$exam->id]['senha_paciente'] . "</li>
 												</ul>"
@@ -503,37 +630,44 @@ class GaleriaLaudos {
 	 * 
 	 * - required $formID string ( the html id property for the div which will wrap the form )
 	 * - required $disableSubmit boolean ( if true, submit button will be disabled. If false, it stays enabled )
-	 * - optional $valuesObj object ( an object which methods return strings. Use this to access pre-defined values for 'titulo', 'obs_medico' and 'obs_paciente' input fields )
+	 * - optional $valuesObj object ( an object which methods return strings. Use this to access pre-defined values for 'titulo', 'obsmedico' and 'obspaciente' input fields )
 	 * - optional $customInput string ( use this if you want to have custom input fields )
 	 * - optional $inputErrors array ( use this to span input errors or maybe recommendations for the fields )
 	 * 
 	 * - return string with the form
 	 */
 	public static function getForm( $formID, $disableSubmit, $valuesObj="", $customInput="", $inputErrors="" ) {
-		
+		$obsmedico = $valuesObj->obs_medico;
+		$obspaciente = $valuesObj->obs_paciente;
 		$disable = "";
 		if ( $disableSubmit === TRUE ) {
 			$disable = "disabled='disabled'";
 		}
-		$form = "<div class='traj_form' id='$formID'>
+		echo "<div class='traj_form' id='$formID'>
 					<form method='POST' enctype='multipart/form-data' action=''>";
-		$form .= $customInput;
-		$form .= "		<fieldset>
+		echo $customInput;
+		echo "		<fieldset>
 							<legend>Cadastro de exame</legend>
 							<p>
 								<label for='title'>Título:</label>
-								<input type='text' name='titulo' id='laudo_title' value='".$valuesObj->titulo."' $disable/><span class='input_error' id='titulo_error'>".$inputErrors['titulo']."</span>
+								<input type='text' name='titulo' id='traj_laudo-title' value='".$valuesObj->titulo."' $disable/><span class='traj_input-error' id='traj_titulo-error'>".$inputErrors['titulo']."</span>
 							</p>
-							<span class='input_error' id='exame_error'>".$inputErrors['exame']."</span>
-							<p>
-								<label for='obs_medico'>Anotações para o médico:</label>
-								<textarea name='obs_medico' id='obs_medico' $disable >".$valuesObj->obs_medico."</textarea>
-							</p>
-							<p>
-								<label for='obs_paciente'>Anotações para a paciente:</label>
-								<textarea name='obs_paciente' id='obs_paciente' $disable>".$valuesObj->obs_paciente."</textarea>
-							</p>
-	    					<div class='file_upload' id='file1'><input name='file[]' type='file' $disable/>1</div>
+							<span class='traj_input-error' id='traj_exam-error'>".$inputErrors['exame']."</span>
+							
+							<label for='obsmedico'>Anotações para o médico:</label>";
+		if ( $disableSubmit === FALSE ) {
+			echo wp_editor($obsmedico, 'obsmedico');
+		} else {	
+			echo "			<textarea name='obsmedico' id='obsmedico' $disable >".$valuesObj->obs_medico."</textarea>";
+		}
+		
+		echo "				<label for='obspaciente'>Anotações para a paciente:</label>";
+		if ( $disableSubmit === FALSE ) {
+			echo wp_editor($obspaciente, 'obspaciente');
+		} else {
+			echo "			<textarea name='obspaciente' id='obspaciente' $disable>".$valuesObj->obs_paciente."</textarea>";
+		}						
+		echo "				<div class='file_upload' id='file1'><input name='file[]' type='file' $disable/>1</div>
 	    					<div id='file_tools'>
 	        					<div id='add_file'>Adicionar</div>
 	        						<div id='del_file'>Remover</div>
@@ -542,8 +676,6 @@ class GaleriaLaudos {
 						<input type='submit' value='Enviar' $disable/>
 					</form>
 				</div>";
-		
-		return $form;
 		
 	}
 	
@@ -569,7 +701,7 @@ class GaleriaLaudos {
 							<legend>Seleção de paciente</legend>
 							<p>
 								<label for='nome_paciente'>Pacientes cadastrados:</label>
-								<select name='paciente_id' id='paciente_dropdown' $disabled>
+								<select name='paciente_id' id='traj_paciente-dropdown' $disabled>
 									<option value='selecione'>$selectedOption</option>"
 					);
 							
@@ -707,7 +839,7 @@ class GaleriaLaudos {
 			// if there's no such a patient
 			if( $result['totalPatients'] == 0 ) {
 				// prepare 'wrong matricula' error msg
-				$inputErrors['matricula'] = "<p class='msg_on_failure' id='wrong_matricula'>A matricula digitada nao existe. Por favor, tente novamente.</p>";
+				$inputErrors['matricula'] = "<p class='traj_msg-on-failure' id='traj_wrong-matricula'>A matricula digitada nao existe. Por favor, tente novamente.</p>";
 			// else, we found a patient
 			} else {
 				// get patient ID
@@ -717,7 +849,7 @@ class GaleriaLaudos {
 				// if no luck
 				if ( $result['totalExams'] == 0 ) {
 					// prepare 'wrong senha' error msg
-					$inputErrors['senha'] = "<p class='msg_on_failure' id='wrong_senha'>A senha digitada nao corresponde a nenhum exame cadastrado para essa matricula. Por favor, tente novamente.</p>";
+					$inputErrors['senha'] = "<p class='traj_msg-on-failure' id='traj_wrong-senha'>A senha digitada nao corresponde a nenhum exame cadastrado para essa matricula. Por favor, tente novamente.</p>";
 				}
 			}
 			
@@ -731,16 +863,16 @@ class GaleriaLaudos {
 			// show form
 			echo (
 				"<div>
-					<p class='msg' id='confirm_user'>Entre com a matrícula do paciente e a senha associada ao exame para poder visualizar os dados do mesmo.</p>
+					<p class='traj_msg' id='traj_confirm-user'>Entre com a matrícula do paciente e a senha associada ao exame para poder visualizar os dados do mesmo.</p>
 					<form method='POST' enctype='multipart/form-data' action=''>
 						<input type='hidden' name='submit' value='set' />
 						<p>
 							<label for='traj_matricula_input'>Matrícula:</label>
-							<input type='text' name='matricula_input' id='traj_matricula_input' />
+							<input type='text' name='matricula_input' id='traj_matricula-input' />
 						</p>
 						<p>
 							<label for='traj_password_input'>Senha:</label>
-							<input type='password' name='senha_input' id='traj_password_input' />
+							<input type='password' name='senha_input' id='traj_password-input' />
 						</p>
 						<input type='submit' value='ok' />
 					</form>
@@ -751,7 +883,7 @@ class GaleriaLaudos {
 			// get all exam details
 			$exame = $wpdb->get_row( "SELECT * FROM traj_exames WHERE paciente_id = $pacienteID AND ( senha_paciente = '$senha' OR senha_medico = '$senha' )" );
 			// show exam title
-			echo "<h2 class='traj_exam_title'>".$exame->titulo."</h2>";
+			echo "<h2 class='traj_exam-title'>".$exame->titulo."</h2>";
 			// if there are any related files...
 			if ( !empty( $exame->arquivos ) ) {
 				// rebuild files array
@@ -771,7 +903,7 @@ class GaleriaLaudos {
 				// if there's at least one video and the video player function exists
 				if ( !empty( $videos ) && function_exists('hana_flv_player_template_call') ) {
 					// title for the video galery
-					echo "<h3 class='traj_exam_files'>Vídeos do exame</h3>";
+					echo "<h3 class='traj_exam-files' id='traj_exam-videos'>Vídeos do exame</h3>";
 					// time to display the videos!
 					foreach ( $videos as $vid ) {
 						// configure video thumbs here
@@ -784,7 +916,7 @@ class GaleriaLaudos {
 						showFullScreenButton: true, showMenu: false, controlsOverVideo: 'locked',controlBarBackgroundColor: -1,
 						controlBarGloss: 'none', usePlayOverlay:true \"
 						";
-						echo "<div class='traj_video_thumbs'>".hana_flv_player_template_call($hana_arg)."</div>";
+						echo "<div class='traj_video-thumbs'>".hana_flv_player_template_call($hana_arg)."</div>";
 						
 					}
 	
@@ -792,11 +924,11 @@ class GaleriaLaudos {
 				// if there's at least one image
 				if ( !empty( $images ) ) {
 					// title for the image galery
-					echo "<h3 class='traj_exam_files'>Imagens do exame</h3>";
+					echo "<h3 class='traj_exam-files' id='traj_exam-images'>Imagens do exame</h3>";
 					// time to display the images!
 					foreach ( $images as $img ) {
 						// configure image thumbs here
-						echo "<a href='".plugins_url( "/uploads/$img", __FILE__ )."' rel='wp-video-lightbox'><img class='traj_image_thumbs' height='150' src='".plugins_url( "/uploads/$img", __FILE__ )."' /></a>";
+						echo "<a href='".plugins_url( "/uploads/$img", __FILE__ )."' rel='wp-video-lightbox'><img class='traj_image-thumbs' height='150' src='".plugins_url( "/uploads/$img", __FILE__ )."' /></a>";
 					}
 					
 				}
@@ -805,11 +937,11 @@ class GaleriaLaudos {
 			// if user is the patient
 			if ( $senha == $exame->senha_paciente ) {
 				// show comments for patient
-				echo "<p class='traj_exam_obs' id='traj_obs_paciente'>".$exame->obs_paciente."</p>";
+				echo "<p class='traj_exam-obs' id='traj_obspaciente'>".$exame->obs_paciente."</p>";
 			// else, he is the medic
 			} else {
 				// show comments for medic
-				echo "<p class='traj_exam_obs' id='traj_obs_medico'>".$exame->obs_medico."</p>";
+				echo "<p class='traj_exam-obs' id='traj_obsmedico'>".$exame->obs_medico."</p>";
 				
 			}
 			
